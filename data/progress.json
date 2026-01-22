@@ -9,6 +9,41 @@
           "fails": 1,
           "points": 51,
           "updated_at": 1769082455
+        },
+        "kc_text_008": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 34,
+          "updated_at": 1769086797
+        },
+        "kc_text_004": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087176
+        },
+        "kc_text_012": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087177
+        },
+        "kc_text_021": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087177
+        },
+        "kc_text_022": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087180
         }
       }
     },
@@ -16,10 +51,10 @@
       "questions": {
         "mi2_text_036": {
           "mastered": false,
-          "attempts": 1,
-          "fails": 1,
+          "attempts": 2,
+          "fails": 2,
           "points": 0,
-          "updated_at": 1769082642
+          "updated_at": 1769086826
         },
         "mi2_text_009": {
           "mastered": false,
@@ -30,12 +65,97 @@
         },
         "mi2_text_013": {
           "mastered": false,
-          "attempts": 6,
-          "fails": 6,
+          "attempts": 7,
+          "fails": 7,
           "points": 0,
-          "updated_at": 1769082760
+          "updated_at": 1769087175
+        },
+        "mi2_text_035": {
+          "mastered": false,
+          "attempts": 2,
+          "fails": 2,
+          "points": 0,
+          "updated_at": 1769086867
+        },
+        "mi2_text_001": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087177
+        },
+        "mi2_text_026": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087178
+        },
+        "mi2_text_030": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087179
+        },
+        "mi2_text_039": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087181
+        }
+      }
+    },
+    "decks/ASB.json": {
+      "questions": {
+        "asb_text_004": {
+          "mastered": false,
+          "attempts": 2,
+          "fails": 2,
+          "points": 0,
+          "updated_at": 1769086843
+        },
+        "asb_text_006": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087178
+        },
+        "asb_text_005": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769087182
         }
       }
     }
+  },
+  "daily_pack": {
+    "date": "2026-01-22",
+    "qids": [
+      "decks/MFI2.json::mi2_text_013",
+      "decks/KeyCompetencees.json::kc_text_004",
+      "decks/KeyCompetencees.json::kc_text_012",
+      "decks/MFI2.json::mi2_text_001",
+      "decks/KeyCompetencees.json::kc_text_021",
+      "decks/MFI2.json::mi2_text_026",
+      "decks/ASB.json::asb_text_006",
+      "decks/MFI2.json::mi2_text_030",
+      "decks/KeyCompetencees.json::kc_text_022",
+      "decks/MFI2.json::mi2_text_039",
+      "decks/ASB.json::asb_text_005",
+      "decks/MFI2.json::mi2_text_021",
+      "decks/KeyCompetencees.json::kc_text_013",
+      "decks/MFI2.json::mi2_text_003",
+      "decks/ASB.json::asb_text_008",
+      "decks/MFI2.json::mi2_text_011",
+      "decks/ASB.json::asb_text_003",
+      "decks/MFI2.json::mi2_text_035",
+      "decks/MFI2.json::mi2_text_007",
+      "decks/MFI2.json::mi2_text_022"
+    ]
   }
 }

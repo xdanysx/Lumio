@@ -18,10 +18,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from datetime import date
 import math
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import (Qt, QEvent)
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QMainWindow,
     QWidget,
     QVBoxLayout,
@@ -38,6 +39,9 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
 )
+
+from focus_lock import FocusLockManager
+
 
 APP_NAME = "Lumio"
 DECKS_DIR = "decks"
@@ -257,6 +261,25 @@ def deck_daily_quota(meta_due: Optional[date], remaining: int) -> int:
             return remaining
         return int(math.ceil(remaining / days_left))
 
+def today_iso() -> str:
+    return date.today().isoformat()
+
+def get_daily_pack(db: dict) -> Optional[List[str]]:
+    day = today_iso()
+    dp = db.get("daily_pack")
+    if not isinstance(dp, dict):
+        return None
+    if dp.get("date") != day:
+        return None
+    qids = dp.get("qids")
+    if not isinstance(qids, list):
+        return None
+    return [str(x) for x in qids]
+
+def set_daily_pack(db: dict, qids: List[str]) -> None:
+    db["daily_pack"] = {"date": today_iso(), "qids": list(qids)}
+    save_progress(db)
+
 # ----------------------------
 # Deck Picker Dialog
 # ----------------------------
@@ -278,6 +301,10 @@ class DeckPickerDialog(QDialog):
         title.setFont(tf)
         layout.addWidget(title)
 
+        self.adhd_mode: bool = False
+        self.adhd_box = QCheckBox("ADHS-Modus (Fokus: schwarzer Hintergrund + Lumio im Vordergrund)")
+        layout.addWidget(self.adhd_box)
+
         self.list = QListWidget()
         self.list.setStyleSheet("font-size: 13px;")
         layout.addWidget(self.list)
@@ -297,7 +324,7 @@ class DeckPickerDialog(QDialog):
             item.setCheckState(Qt.CheckState.Unchecked)
             self.list.addItem(item)
 
-
+        self.selected_paths: List[Path] = []
 
         if self.list.count() > 0:
             self.list.setCurrentRow(0)
@@ -316,6 +343,7 @@ class DeckPickerDialog(QDialog):
         if not selected:
             return
         self.selected_paths = selected
+        self.adhd_mode = bool(self.adhd_box.isChecked())
         self.accept()
 
 # ----------------------------
@@ -343,13 +371,16 @@ class SubmitTextEdit(QTextEdit):
 # ----------------------------
 
 class LumioMainWindow(QMainWindow):
-    def __init__(self, deck_paths: List[Path]):
+    def __init__(self, deck_paths: List[Path], adhd_mode: bool = False):
         super().__init__()
 
         self.setWindowTitle(APP_NAME)
         self.resize(980, 680)
 
         self.deck_paths = deck_paths
+
+        self.adhd_mode = adhd_mode
+        self.focus_lock = FocusLockManager(self, enabled=self.adhd_mode, reactivate_minutes=5)
 
         # progress
         self.progress_db = load_progress()
@@ -390,15 +421,27 @@ class LumioMainWindow(QMainWindow):
             self.points[gqid] = int(q_entry.get("points", -1))
 
         # today's pack
-        self.queue: List[str] = self._build_daily_queue()
+        saved = get_daily_pack(self.progress_db)
+        if saved:
+            # Nur offene Fragen behalten (falls seitdem etwas mastered wurde)
+            self.queue = [gqid for gqid in saved if gqid in self.all_questions and gqid not in self.mastered]
+        else:
+            self.queue = self._build_daily_queue()
+            random.shuffle(self.queue)
+            set_daily_pack(self.progress_db, self.queue)
+
         self.today_set = set(self.queue)
-        random.shuffle(self.queue)
+
 
         self.current_id: Optional[str] = None
         self.last_result: Optional[Dict[str, Any]] = None
 
         self._build_ui()
         self._load_current()
+
+        if self.adhd_mode and len(self.today_set) > 0:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self.focus_lock.enable_lock)
 
     def on_submit(self):
         # Enter: wenn Next enabled -> Next, sonst -> Check
@@ -511,30 +554,9 @@ class LumioMainWindow(QMainWindow):
         self.next_btn.setShortcut("Ctrl+N")
 
     def _build_daily_queue(self) -> List[str]:
-        qids = []
-        for dk, d in self.decks.items():
-            meta = d["meta"]
-            qs: List[TextQuestion] = d["questions"]
-
-            # remaining in deck
-            total = len(qs)
-            mastered_in_deck = sum(1 for q in qs if f"{dk}::{q.id}" in self.mastered)
-            remaining = total - mastered_in_deck
-
-            quota = deck_daily_quota(getattr(meta, "due_date", None), remaining)
-            if quota <= 0:
-                continue
-
-            # Kandidaten: nicht mastered
-            candidates = [f"{dk}::{q.id}" for q in qs if f"{dk}::{q.id}" not in self.mastered]
-            random.shuffle(candidates)
-            qids.extend(candidates[:quota])
-
-        # Wenn gar keine due_dates gesetzt: fallback = alle offenen mischen (optional)
-        if not qids:
-            # fallback: einfach alles offene mischen
-            qids = [gqid for gqid in self.all_questions.keys() if gqid not in self.mastered]
-        return qids
+        qids = [gqid for gqid in self.all_questions.keys() if gqid not in self.mastered]
+        random.shuffle(qids)
+        return qids[:20]  # Tageslimit
 
     def _update_progress(self):
         # Tagesziel = len(queue)+mastered_today? -> Wir definieren: today's pack = self.today_set
@@ -599,7 +621,6 @@ class LumioMainWindow(QMainWindow):
         self.next_btn.setEnabled(False)
         self.text.setFocus()
 
-
     def _format_feedback(self, q: TextQuestion, result: Dict[str, Any], points: Optional[int] = None) -> Tuple[str, str]:
         eff = result["effective"] * 100
         cov = result["coverage"] * 100
@@ -656,7 +677,8 @@ class LumioMainWindow(QMainWindow):
             self.fail_counts[self.current_id] = self.fail_counts.get(self.current_id, 0) + 1
             if self.queue and self.queue[0] == self.current_id:
                 self.queue.pop(0)
-            self.queue.append(self.current_id)
+            # NICHT wieder hinten anhängen -> keine Wiederholung am selben Tag
+
 
         self._persist_question_state(self.current_id)
         self._update_progress()
@@ -666,6 +688,10 @@ class LumioMainWindow(QMainWindow):
 
         self.check_btn.setDisabled(True)
         self.next_btn.setEnabled(True)
+
+        if self._today_completed():
+            # Fokus aus, normales Fenster
+            self.focus_lock.disable_lock()
 
     def on_next(self):
         self._load_current()
@@ -689,6 +715,7 @@ class LumioMainWindow(QMainWindow):
         save_progress(self.progress_db)
 
     def on_reset(self):
+
         resp = QMessageBox.question(self, APP_NAME, "Heutiges Tagespaket neu würfeln?")
         if resp != QMessageBox.StandardButton.Yes:
             return
@@ -701,6 +728,18 @@ class LumioMainWindow(QMainWindow):
         self.next_btn.setEnabled(False)
         self._load_current()
 
+    def _today_completed(self) -> bool:
+        return all(gqid in self.mastered for gqid in self.today_set)
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.ActivationChange:
+            # Wenn heute fertig und Fenster nicht mehr aktiv -> Timer starten
+            if self.adhd_mode and self._today_completed():
+                if not self.isActiveWindow():
+                    self.focus_lock.schedule_reactivate_if_inactive()
+                else:
+                    self.focus_lock.cancel_reactivate()
 
 def main():
     app = QApplication([])
@@ -716,7 +755,7 @@ def main():
         return
 
     try:
-        win = LumioMainWindow(picker.selected_paths)
+        win = LumioMainWindow(picker.selected_paths, adhd_mode=picker.adhd_mode)
     except Exception as e:
         QMessageBox.critical(None, APP_NAME, f"Fehler beim Laden der Decks:\n{e}")
         return
@@ -724,7 +763,6 @@ def main():
 
     win.show()
     app.exec()
-
 
 if __name__ == "__main__":
     main()
