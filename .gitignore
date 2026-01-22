@@ -2,3 +2,4 @@
 .dist/
 decks/.
 data/.
+src/__pycache__
