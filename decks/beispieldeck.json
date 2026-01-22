@@ -1,34 +1,38 @@
-[
-  {
-    "id": "beispiel_01",
-    "type": "text",
-    "prompt": "Was rechnet man 1 + 2",
-    "rubric": [
-      ["addiert"],
-      ["eins","1"],
-      ["plus"],
-      ["zwei","2"],
-      ["gleich"],
-      ["drei","3"]
-    ],
-    "pass_ratio": 0.7,
-    "min_words": 10,
-    "example": "Man addiert einfach eins plus 2 und das ergebnis sollte gleich 3 sein"
+{
+  "meta": {
+    "title": "Beispieldeck",
+    "due_date": "2026-02-18"
   },
-  {
-    "id": "beispiel_02",
-    "type": "text",
-    "prompt": "Was rechnet man 1 + 2",
-    "rubric": [
-      ["addiert"],
-      ["eins","1"],
-      ["plus"],
-      ["zwei","2"],
-      ["gleich"],
-      ["drei","3"]
-    ],
-    "pass_ratio": 0.7,
-    "min_words": 10,
-    "example": "Man addiert einfach eins plus 2 und das ergebnis sollte gleich 3 sein"
-  }
-]
+  "questions": [
+      {
+        "id": "kc_text_004",
+        "type": "text",
+        "prompt": "Erkläre, warum Ports benötigt werden, obwohl eine IP-Adresse einen Rechner eindeutig identifiziert.",
+        "rubric": [
+            ["port"],
+            ["dienst", "service", "prozess"],
+            ["zuordnung"],
+            ["ip adresse"],
+            ["gleichzeitig", "mehrere"]
+        ],
+        "pass_ratio": 0.7,
+        "min_words": 25,
+        "example": "Eine IP-Adresse identifiziert nur den Rechner im Netzwerk, aber nicht den einzelnen Port, an dem kommuniziert wird. Auf einem Host laufen mehrere Dienste/Services bzw. Prozesse parallel, z.B. Webserver und Datenbank. Ports erlauben die Zuordnung (Mapping) einer Verbindung zum richtigen Prozess. Dadurch kann ein Rechner über dieselbe IP-Adresse gleichzeitig mehrere Verbindungen und mehrere Anwendungen bedienen."
+        },
+        {
+        "id": "kc_text_005",
+        "type": "text",
+        "prompt": "Erkläre den Unterschied zwischen well-known ports und registered ports.",
+        "rubric": [
+            ["well-known"],
+            ["registered"],
+            ["0-1023"],
+            ["1024-49151"],
+            ["iana"]
+        ],
+        "pass_ratio": 0.7,
+        "min_words": 25,
+        "example": "Well-known ports sind die standardisierten Ports im Bereich 0-1023, die typischen Basisdiensten zugeordnet sind. Registered ports liegen im Bereich 1024-49151 und werden für Anwendungen/Services registriert, sind aber weniger streng „systemkritisch“ als well-known. Die Verwaltung bzw. Zuteilung solcher Portbereiche erfolgt durch die IANA. Praktisch bedeutet das: well-known = feste Standards, registered = offiziell registrierbare Anwendungs-Ports."
+        }
+    ]
+}

@@ -1,0 +1,149 @@
+{
+  "meta": {
+    "title": "Automaten, Sprachen und Berechenbarkeit",
+    "due_date": "2026-02-18"
+  },
+  "questions": [
+    {
+      "id": "asb_text_001",
+      "type": "text",
+      "prompt": "Erkläre den Unterschied zwischen einem deterministischen endlichen Automaten (DEA) und einem nichtdeterministischen endlichen Automaten (NEA).",
+      "rubric": [
+        ["dea", "deterministisch"],
+        ["nea", "nichtdeterministisch"],
+        ["übergang"],
+        ["eindeutig"],
+        ["mehrere", "keine"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 30,
+      "example": "Ein deterministischer endlicher Automat (DEA) besitzt für jeden Zustand und jedes Eingabesymbol genau einen definierten Übergang. Beim nichtdeterministischen endlichen Automaten (NEA) können für ein Symbol mehrere, genau ein oder auch kein Übergang existieren. Dadurch kann ein NEA mehrere Rechenwege parallel verfolgen, während der DEA immer eindeutig weiterrechnet."
+    },
+    {
+      "id": "asb_text_002",
+      "type": "text",
+      "prompt": "Was ist ein ε-Übergang und in welchen Automatenmodellen ist er erlaubt?",
+      "rubric": [
+        ["epsilon", "ε"],
+        ["ohne eingabesymbol"],
+        ["nea"],
+        ["dea nicht erlaubt"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 25,
+      "example": "Ein ε-Übergang ist ein Übergang, der ohne Lesen eines Eingabesymbols ausgeführt wird. Der Automat kann damit spontan in einen anderen Zustand wechseln. ε-Übergänge sind nur bei NEAs erlaubt, nicht bei DEAs, da dort die Übergangsfunktion eindeutig sein muss."
+    },
+    {
+      "id": "asb_text_003",
+      "type": "text",
+      "prompt": "Erkläre, was mit der Sprache L(M) eines Automaten gemeint ist.",
+      "rubric": [
+        ["sprache"],
+        ["akzeptiert"],
+        ["wort"],
+        ["automat"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 20,
+      "example": "Die Sprache L(M) eines Automaten M ist die Menge aller Wörter über dem Alphabet, die vom Automaten akzeptiert werden. Ein Wort gehört genau dann zu L(M), wenn der Automat nach dem vollständigen Lesen des Wortes in einem Endzustand endet."
+    },
+    {
+      "id": "asb_text_004",
+      "type": "text",
+      "prompt": "Warum sind ε-Zyklen in Automaten problematisch?",
+      "rubric": [
+        ["epsilon-zyklus"],
+        ["unendlich"],
+        ["entfernen"],
+        ["epsilon-frei"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 25,
+      "example": "ε-Zyklen bestehen aus Kreisen von ε-Übergängen und erlauben dem Automaten, beliebig oft Zustände zu wechseln, ohne Eingabe zu lesen. Dadurch können unendliche Rechenwege entstehen. Deshalb müssen ε-Zyklen bei der Umwandlung in ε-freie Automaten entfernt werden."
+    },
+    {
+      "id": "asb_text_005",
+      "type": "text",
+      "prompt": "Was ist eine reguläre Grammatik und welche Sprachklasse beschreibt sie?",
+      "rubric": [
+        ["reguläre grammatik"],
+        ["produktion"],
+        ["typ 3"],
+        ["reguläre sprache"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 30,
+      "example": "Eine reguläre Grammatik ist eine Grammatik, deren Produktionen nur eine sehr eingeschränkte Form besitzen, zum Beispiel A→aB oder A→a. Sie beschreibt genau die regulären Sprachen, also die Sprachen der Chomsky-Hierarchie vom Typ 3, die auch durch endliche Automaten erkannt werden können."
+    },
+    {
+      "id": "asb_text_006",
+      "type": "text",
+      "prompt": "Erkläre den Unterschied zwischen einer entscheidbaren und einer semientscheidbaren Sprache.",
+      "rubric": [
+        ["entscheidbar"],
+        ["semientscheidbar"],
+        ["turingmaschine"],
+        ["hält"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 35,
+      "example": "Eine Sprache ist entscheidbar, wenn es eine Turingmaschine gibt, die für jedes Wort anhält und korrekt entscheidet, ob das Wort zur Sprache gehört. Eine Sprache ist semientscheidbar, wenn die Turingmaschine für Wörter in der Sprache anhält und akzeptiert, für Wörter außerhalb der Sprache aber möglicherweise unendlich weiterläuft."
+    },
+    {
+      "id": "asb_text_007",
+      "type": "text",
+      "prompt": "Warum ist die Sprache L = {0^n 1^n | n ≥ 0} nicht regulär?",
+      "rubric": [
+        ["nicht regulär"],
+        ["pumping lemma"],
+        ["gleich viele"],
+        ["struktur"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 35,
+      "example": "Die Sprache L = {0^n1^n} ist nicht regulär, da ein endlicher Automat sich nicht merken kann, wie viele Nullen gelesen wurden. Mit dem Pumping-Lemma lässt sich zeigen, dass das Aufpumpen eines Teilwortes die Gleichheit der Anzahl von 0 und 1 zerstört, wodurch das gepumpte Wort nicht mehr in der Sprache liegt."
+    },
+    {
+      "id": "asb_text_008",
+      "type": "text",
+      "prompt": "Was ist ein Kellerautomat und welche Sprachklasse erkennt er?",
+      "rubric": [
+        ["kellerautomat"],
+        ["stack"],
+        ["kontextfrei"],
+        ["typ 2"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 30,
+      "example": "Ein Kellerautomat ist ein Automat, der zusätzlich zu seinen Zuständen einen Stack (Keller) besitzt. Dadurch kann er sich Informationen merken, etwa die Anzahl gelesener Symbole. Kellerautomaten erkennen genau die kontextfreien Sprachen, also die Sprachklasse vom Typ 2 der Chomsky-Hierarchie."
+    },
+    {
+      "id": "asb_text_009",
+      "type": "text",
+      "prompt": "Was beschreibt die Chomsky-Hierarchie?",
+      "rubric": [
+        ["chomsky"],
+        ["typ 0-3"],
+        ["mächtigkeit"],
+        ["einschluss"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 35,
+      "example": "Die Chomsky-Hierarchie ordnet formale Sprachen nach ihrer Mächtigkeit in vier Typen ein: Typ 3 (regulär), Typ 2 (kontextfrei), Typ 1 (kontextsensitiv) und Typ 0 (rekursiv aufzählbar). Jede höhere Stufe umfasst alle darunterliegenden Sprachklassen und kann komplexere Strukturen beschreiben."
+    },
+    {
+      "id": "asb_text_010",
+      "type": "text",
+      "prompt": "Was ist das Halteproblem?",
+      "rubric": [
+        ["halteproblem"],
+        ["unentscheidbar"],
+        ["turingmaschine"],
+        ["beweisidee"]
+      ],
+      "pass_ratio": 0.7,
+      "min_words": 30,
+      "example": "Das Halteproblem beschreibt die Frage, ob eine gegebene Turingmaschine bei einer bestimmten Eingabe jemals anhält. Es ist unentscheidbar, da es keine allgemeine Turingmaschine geben kann, die diese Frage für alle möglichen Maschinen und Eingaben korrekt beantwortet."
+    }
+  ]
+}

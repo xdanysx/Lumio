@@ -15,6 +15,8 @@ import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from datetime import date
+import math
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -39,7 +41,8 @@ from PySide6.QtWidgets import (
 
 APP_NAME = "Lumio"
 DECKS_DIR = "decks"
-
+PROGRESS_FILE = "progress.json"
+DATA_DIR = "data"
 
 # ----------------------------
 # Data Model
@@ -55,6 +58,10 @@ class TextQuestion:
     max_repeats: int = 999999
     example: str = ""
 
+@dataclass
+class DeckMeta:
+    title: Optional[str] = None
+    due_date: Optional[date] = None
 
 # ----------------------------
 # Text Scoring
@@ -113,7 +120,6 @@ def compute_score(q: TextQuestion, user_text: str) -> Dict[str, Any]:
         "matched": matched,
     }
 
-
 # ----------------------------
 # Deck Loading / Paths
 # ----------------------------
@@ -138,22 +144,49 @@ def list_decks(decks_dir: Path) -> List[Path]:
 
 def pretty_deck_name(filename: str) -> str:
     stem = Path(filename).stem
-    stem = stem.replace("_", " ").replace("-", " ")
-    stem = re.sub(r"\s+", " ", stem).strip()
-    return " ".join([w if any(c.isdigit() for c in w) else w.capitalize() for w in stem.split()])
+    stem = re.sub(r"[_-]+", " ", stem)       # Trenner -> Space
+    stem = re.sub(r"\s+", " ", stem).strip() # Mehrfachspaces
+    return stem
 
-def load_deck(deck_path: str) -> List[TextQuestion]:
+def load_deck(deck_path: str) -> Tuple[DeckMeta, List[TextQuestion]]:
     if not os.path.exists(deck_path):
         raise FileNotFoundError(f"Deck file not found: {deck_path}")
 
     with open(deck_path, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
-    if not isinstance(raw, list):
-        raise ValueError("Deck JSON must be a list of question objects.")
+    meta = DeckMeta()
+    items = None
+
+    # Neues Format: {"meta": {...}, "questions": [...]}
+    if isinstance(raw, dict):
+        meta_obj = raw.get("meta", {})
+        if isinstance(meta_obj, dict):
+            title = meta_obj.get("title")
+            if isinstance(title, str) and title.strip():
+                meta.title = title.strip()
+
+            due = meta_obj.get("due_date")
+            if isinstance(due, str) and due.strip():
+                try:
+                    y, m, d = due.strip().split("-")
+                    meta.due_date = date(int(y), int(m), int(d))
+                except Exception:
+                    raise ValueError(f"Invalid meta.due_date (expected YYYY-MM-DD): {due}")
+
+        items = raw.get("questions")
+        if not isinstance(items, list):
+            raise ValueError("Deck JSON: 'questions' must be a list.")
+
+    # Altes Format: [...]
+    elif isinstance(raw, list):
+        items = raw
+
+    else:
+        raise ValueError("Deck JSON must be a list OR an object with {meta, questions}.")
 
     questions: List[TextQuestion] = []
-    for i, obj in enumerate(raw):
+    for i, obj in enumerate(items):
         if not isinstance(obj, dict):
             raise ValueError(f"Question at index {i} is not an object.")
         if obj.get("type") != "text":
@@ -182,8 +215,47 @@ def load_deck(deck_path: str) -> List[TextQuestion]:
 
     if not questions:
         raise ValueError("No 'text' questions found in deck.")
-    return questions
 
+    return meta, questions
+
+def data_dir_path() -> Path:
+    d = project_root() / DATA_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def progress_file_path() -> Path:
+    return data_dir_path() / PROGRESS_FILE
+
+def load_progress() -> dict:
+    p = progress_file_path()
+    if not p.exists():
+        return {"version": 1, "decks": {}}
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {"version": 1, "decks": {}}
+
+def save_progress(db: dict) -> None:
+    p = progress_file_path()
+    p.write_text(json.dumps(db, ensure_ascii=False, indent=2), encoding="utf-8")
+
+def deck_key(deck_path: Path) -> str:
+    # stabiler Key (relativ zum project root)
+    try:
+        return str(deck_path.resolve().relative_to(project_root().resolve())).replace("\\", "/")
+    except Exception:
+        return str(deck_path.resolve()).replace("\\", "/")
+
+def deck_daily_quota(meta_due: Optional[date], remaining: int) -> int:
+        if remaining <= 0:
+            return 0
+        if not meta_due:
+            return 0  # ohne due_date keine Pflichtquote (oder setze Default)
+        today = date.today()
+        days_left = (meta_due - today).days
+        if days_left <= 0:
+            return remaining
+        return int(math.ceil(remaining / days_left))
 
 # ----------------------------
 # Deck Picker Dialog
@@ -196,7 +268,6 @@ class DeckPickerDialog(QDialog):
         self.resize(520, 420)
 
         self._decks = decks
-        self.selected_path: Optional[Path] = None
 
         layout = QVBoxLayout(self)
 
@@ -213,14 +284,23 @@ class DeckPickerDialog(QDialog):
 
         for p in decks:
             label = pretty_deck_name(p.name)
+            try:
+                m, _qs = load_deck(str(p))
+                if m.title:
+                    label = m.title
+            except Exception:
+                pass
+
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, str(p))
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
             self.list.addItem(item)
+
+
 
         if self.list.count() > 0:
             self.list.setCurrentRow(0)
-
-        self.list.itemDoubleClicked.connect(self._accept_selected)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._accept_selected)
@@ -228,13 +308,15 @@ class DeckPickerDialog(QDialog):
         layout.addWidget(buttons)
 
     def _accept_selected(self):
-        item = self.list.currentItem()
-        if not item:
+        selected = []
+        for i in range(self.list.count()):
+            item = self.list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(Path(item.data(Qt.ItemDataRole.UserRole)))
+        if not selected:
             return
-        p = Path(item.data(Qt.ItemDataRole.UserRole))
-        self.selected_path = p
+        self.selected_paths = selected
         self.accept()
-
 
 # ----------------------------
 # TextEdit: Enter=Submit, Shift+Enter=Newline
@@ -261,25 +343,56 @@ class SubmitTextEdit(QTextEdit):
 # ----------------------------
 
 class LumioMainWindow(QMainWindow):
-    def __init__(self, deck_path: Path):
+    def __init__(self, deck_paths: List[Path]):
         super().__init__()
 
         self.setWindowTitle(APP_NAME)
         self.resize(980, 680)
 
-        self.deck_path = deck_path
-        self.deck_file = deck_path.name
+        self.deck_paths = deck_paths
 
-        self.questions: List[TextQuestion] = load_deck(str(self.deck_path))
-        self.q_by_id: Dict[str, TextQuestion] = {q.id: q for q in self.questions}
+        # progress
+        self.progress_db = load_progress()
 
-        self.queue: List[str] = [q.id for q in self.questions]
-        random.shuffle(self.queue)
+        # multi-deck store
+        self.decks: Dict[str, Dict[str, Any]] = {}          # dk -> {path, meta, questions}
+        self.all_questions: Dict[str, TextQuestion] = {}    # gqid -> TextQuestion
+        self.global_to_deck: Dict[str, str] = {}            # gqid -> dk
 
+        for dp in self.deck_paths:
+            dk = deck_key(dp)
+            meta, questions = load_deck(str(dp))
+            self.decks[dk] = {"path": dp, "meta": meta, "questions": questions}
+
+            for q in questions:
+                gqid = f"{dk}::{q.id}"
+                self.all_questions[gqid] = q
+                self.global_to_deck[gqid] = dk
+
+        # state
         self.mastered: set[str] = set()
-        self.attempts: Dict[str, int] = {q.id: 0 for q in self.questions}
-        self.fail_counts: Dict[str, int] = {q.id: 0 for q in self.questions}
-        self.points: Dict[str, int] = {q.id: -1 for q in self.questions}
+        self.attempts: Dict[str, int] = {}
+        self.fail_counts: Dict[str, int] = {}
+        self.points: Dict[str, int] = {}
+
+        # load persisted state
+        for gqid, q in self.all_questions.items():
+            dk = self.global_to_deck[gqid]
+            qid = q.id
+            deck_entry = self.progress_db.get("decks", {}).get(dk, {})
+            q_entry = deck_entry.get("questions", {}).get(qid, {})
+
+            if bool(q_entry.get("mastered", False)):
+                self.mastered.add(gqid)
+
+            self.attempts[gqid] = int(q_entry.get("attempts", 0))
+            self.fail_counts[gqid] = int(q_entry.get("fails", 0))
+            self.points[gqid] = int(q_entry.get("points", -1))
+
+        # today's pack
+        self.queue: List[str] = self._build_daily_queue()
+        self.today_set = set(self.queue)
+        random.shuffle(self.queue)
 
         self.current_id: Optional[str] = None
         self.last_result: Optional[Dict[str, Any]] = None
@@ -303,14 +416,14 @@ class LumioMainWindow(QMainWindow):
         layout.setSpacing(12)
 
         top = QHBoxLayout()
-        self.deck_label = QLabel(f"Deck: {pretty_deck_name(self.deck_file)}")
-        self.deck_label.setStyleSheet("font-size: 13px; color: #555;")
+        self.deck_label = QLabel(f"Decks: {len(self.deck_paths)} ausgewählt")
+        self.deck_label.setStyleSheet("font-size: 13px; color: #AAA;")
         top.addWidget(self.deck_label)
 
         top.addStretch(1)
 
         self.progress_text = QLabel("")
-        self.progress_text.setStyleSheet("font-size: 13px; color: #555;")
+        self.progress_text.setStyleSheet("font-size: 13px; color: #AAA;")
         top.addWidget(self.progress_text)
 
         layout.addLayout(top)
@@ -319,7 +432,7 @@ class LumioMainWindow(QMainWindow):
         self.progress.setTextVisible(True)
         self.progress.setFormat("%v / %m bestanden")
         self.progress.setMinimum(0)
-        self.progress.setMaximum(len(self.questions))
+        self.progress.setMaximum(max(len(self.today_set), 1))
         self.progress.setValue(0)
         self.progress.setFixedHeight(22)
         layout.addWidget(self.progress)
@@ -336,7 +449,7 @@ class LumioMainWindow(QMainWindow):
         f.setPointSize(16)
         f.setBold(True)
         self.question_label.setFont(f)
-        self.question_label.setStyleSheet("color: #222;")
+        self.question_label.setStyleSheet("color: #333;")
         qbox_layout.addWidget(self.question_label)
 
         layout.addWidget(qbox)
@@ -397,17 +510,52 @@ class LumioMainWindow(QMainWindow):
         self.check_btn.setShortcut("Ctrl+Return")
         self.next_btn.setShortcut("Ctrl+N")
 
+    def _build_daily_queue(self) -> List[str]:
+        qids = []
+        for dk, d in self.decks.items():
+            meta = d["meta"]
+            qs: List[TextQuestion] = d["questions"]
+
+            # remaining in deck
+            total = len(qs)
+            mastered_in_deck = sum(1 for q in qs if f"{dk}::{q.id}" in self.mastered)
+            remaining = total - mastered_in_deck
+
+            quota = deck_daily_quota(getattr(meta, "due_date", None), remaining)
+            if quota <= 0:
+                continue
+
+            # Kandidaten: nicht mastered
+            candidates = [f"{dk}::{q.id}" for q in qs if f"{dk}::{q.id}" not in self.mastered]
+            random.shuffle(candidates)
+            qids.extend(candidates[:quota])
+
+        # Wenn gar keine due_dates gesetzt: fallback = alle offenen mischen (optional)
+        if not qids:
+            # fallback: einfach alles offene mischen
+            qids = [gqid for gqid in self.all_questions.keys() if gqid not in self.mastered]
+        return qids
+
     def _update_progress(self):
-        total = len(self.questions)
-        done = len(self.mastered)
-        self.progress.setMaximum(total)
-        self.progress.setValue(done)
-        self.progress_text.setText(f"Progress: {done}/{total}")
+        # Tagesziel = len(queue)+mastered_today? -> Wir definieren: today's pack = self.today_set
+        today_total = len(self.today_set)
+        today_done = sum(1 for gqid in self.today_set if gqid in self.mastered)
+
+        overall_total = len(self.all_questions)
+        overall_done = len(self.mastered)
+
+        self.progress.setMaximum(today_total if today_total > 0 else 1)
+        self.progress.setValue(today_done)
+        self.progress.setFormat("%v / %m heute bestanden")
+
+        self.progress_text.setText(
+            f"Heute: {today_done}/{today_total} | Gesamt: {overall_done}/{overall_total}"
+        )
 
     def _load_current(self):
         self._update_progress()
 
-        if len(self.mastered) == len(self.questions):
+        if len(self.mastered) == len(self.all_questions):
             self.current_id = None
             self.question_label.setText("Fertig. Alle Fragen bestanden.")
             self.text.setDisabled(True)
@@ -422,13 +570,22 @@ class LumioMainWindow(QMainWindow):
             self.queue.pop(0)
 
         if not self.queue:
-            remaining = [q.id for q in self.questions if q.id not in self.mastered]
-            random.shuffle(remaining)
-            self.queue = remaining[:]
+            # Tagespaket leer -> neu bauen
+            self.queue = self._build_daily_queue()
+            self.today_set = set(self.queue)
+            random.shuffle(self.queue)
+
+            if not self.queue:
+                self.current_id = None
+                self.question_label.setText("Keine offenen Fragen im Tagespaket.")
+                return
 
         self.current_id = self.queue[0]
-        q = self.q_by_id[self.current_id]
-
+        q = self.all_questions[self.current_id]
+        dk = self.global_to_deck[self.current_id]
+        meta = self.decks[dk]["meta"]
+        title = meta.title or pretty_deck_name(self.decks[dk]["path"].name)
+        self.deck_label.setText(f"Aktuelles Deck: {title}")
         self.question_label.setText(q.prompt)
         self.text.clear()
         self.last_result = None
@@ -440,8 +597,8 @@ class LumioMainWindow(QMainWindow):
         self.text.setDisabled(False)
         self.check_btn.setEnabled(True)
         self.next_btn.setEnabled(False)
-
         self.text.setFocus()
+
 
     def _format_feedback(self, q: TextQuestion, result: Dict[str, Any], points: Optional[int] = None) -> Tuple[str, str]:
         eff = result["effective"] * 100
@@ -466,9 +623,9 @@ class LumioMainWindow(QMainWindow):
             m = matched[i] if i < len(matched) else None
             label = group[0] if group else f"Gruppe {i+1}"
             if ok:
-                rubric_lines.append(f"✅ {label}  (matched: '{m}')")
+                rubric_lines.append(f"Wort verwendet: {label}  (matched: '{m}')")
             else:
-                rubric_lines.append(f"❌ {label}")
+                rubric_lines.append(f"Es Fehlt: {label}")
 
         right = "Rubrik-Details:\n" + "\n".join(rubric_lines)
         return left, right
@@ -477,12 +634,10 @@ class LumioMainWindow(QMainWindow):
         if not self.current_id:
             return
 
-        q = self.q_by_id[self.current_id]
-
-        # darf leer sein
+        q = self.all_questions[self.current_id]
         user_text = self.text.toPlainText()
 
-        self.attempts[self.current_id] += 1
+        self.attempts[self.current_id] = self.attempts.get(self.current_id, 0) + 1
         result = compute_score(q, user_text)
         self.last_result = result
 
@@ -498,11 +653,12 @@ class LumioMainWindow(QMainWindow):
             if self.queue and self.queue[0] == self.current_id:
                 self.queue.pop(0)
         else:
-            self.fail_counts[self.current_id] += 1
+            self.fail_counts[self.current_id] = self.fail_counts.get(self.current_id, 0) + 1
             if self.queue and self.queue[0] == self.current_id:
                 self.queue.pop(0)
             self.queue.append(self.current_id)
 
+        self._persist_question_state(self.current_id)
         self._update_progress()
 
         sol = q.example.strip() if q.example else "(keine Beispielantwort hinterlegt)"
@@ -514,18 +670,32 @@ class LumioMainWindow(QMainWindow):
     def on_next(self):
         self._load_current()
 
+    def _persist_question_state(self, gqid: str) -> None:
+        q = self.all_questions[gqid]
+        dk = self.global_to_deck[gqid]
+        qid = q.id
+
+        decks = self.progress_db.setdefault("decks", {})
+        d = decks.setdefault(dk, {})
+        qs = d.setdefault("questions", {})
+
+        qs[qid] = {
+            "mastered": (gqid in self.mastered),
+            "attempts": int(self.attempts.get(gqid, 0)),
+            "fails": int(self.fail_counts.get(gqid, 0)),
+            "points": int(self.points.get(gqid, -1)),
+            "updated_at": int(__import__("time").time()),
+        }
+        save_progress(self.progress_db)
+
     def on_reset(self):
-        resp = QMessageBox.question(self, APP_NAME, "Session wirklich zurücksetzen?")
+        resp = QMessageBox.question(self, APP_NAME, "Heutiges Tagespaket neu würfeln?")
         if resp != QMessageBox.StandardButton.Yes:
             return
 
-        self.queue = [q.id for q in self.questions]
+        self.queue = self._build_daily_queue()
+        self.today_set = set(self.queue)
         random.shuffle(self.queue)
-
-        self.mastered.clear()
-        self.attempts = {q.id: 0 for q in self.questions}
-        self.fail_counts = {q.id: 0 for q in self.questions}
-        self.points = {q.id: -1 for q in self.questions}
 
         self.check_btn.setEnabled(True)
         self.next_btn.setEnabled(False)
@@ -542,14 +712,15 @@ def main():
         return
 
     picker = DeckPickerDialog(decks)
-    if picker.exec() != QDialog.DialogCode.Accepted or not picker.selected_path:
+    if picker.exec() != QDialog.DialogCode.Accepted or not picker.selected_paths:
         return
 
     try:
-        win = LumioMainWindow(picker.selected_path)
+        win = LumioMainWindow(picker.selected_paths)
     except Exception as e:
-        QMessageBox.critical(None, APP_NAME, f"Fehler beim Laden des Decks:\n{e}")
+        QMessageBox.critical(None, APP_NAME, f"Fehler beim Laden der Decks:\n{e}")
         return
+
 
     win.show()
     app.exec()

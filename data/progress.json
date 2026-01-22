@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "decks": {
+    "decks/KeyCompetencees.json": {
+      "questions": {
+        "kc_text_016": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 51,
+          "updated_at": 1769082455
+        }
+      }
+    },
+    "decks/MFI2.json": {
+      "questions": {
+        "mi2_text_036": {
+          "mastered": false,
+          "attempts": 1,
+          "fails": 1,
+          "points": 0,
+          "updated_at": 1769082642
+        },
+        "mi2_text_009": {
+          "mastered": false,
+          "attempts": 6,
+          "fails": 6,
+          "points": 0,
+          "updated_at": 1769082759
+        },
+        "mi2_text_013": {
+          "mastered": false,
+          "attempts": 6,
+          "fails": 6,
+          "points": 0,
+          "updated_at": 1769082760
+        }
+      }
+    }
+  }
+}
