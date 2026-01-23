@@ -1,5 +1,5 @@
 .venv/
 .dist/
-decks/.
-data/.
+decks/*
+data/*
 src/__pycache__

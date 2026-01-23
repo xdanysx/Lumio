@@ -251,15 +251,13 @@ def deck_key(deck_path: Path) -> str:
         return str(deck_path.resolve()).replace("\\", "/")
 
 def deck_daily_quota(meta_due: Optional[date], remaining: int) -> int:
-        if remaining <= 0:
-            return 0
-        if not meta_due:
-            return 0  # ohne due_date keine Pflichtquote (oder setze Default)
-        today = date.today()
-        days_left = (meta_due - today).days
-        if days_left <= 0:
-            return remaining
-        return int(math.ceil(remaining / days_left))
+    if remaining <= 0:
+        return 0
+    if not meta_due:
+        return 0  # ohne due_date: keine Pflichtquote (optional später fallback)
+    today = date.today()
+    days_left = max((meta_due - today).days, 1)
+    return int(math.ceil(remaining / days_left))
 
 def today_iso() -> str:
     return date.today().isoformat()
@@ -554,9 +552,36 @@ class LumioMainWindow(QMainWindow):
         self.next_btn.setShortcut("Ctrl+N")
 
     def _build_daily_queue(self) -> List[str]:
-        qids = [gqid for gqid in self.all_questions.keys() if gqid not in self.mastered]
+        qids: List[str] = []
+
+        for dk, d in self.decks.items():
+            meta: DeckMeta = d["meta"]
+            qs: List[TextQuestion] = d["questions"]
+
+            # offene Fragen in diesem Deck
+            candidates = [f"{dk}::{q.id}" for q in qs if f"{dk}::{q.id}" not in self.mastered]
+            remaining = len(candidates)
+
+            quota = deck_daily_quota(meta.due_date, remaining)
+            if quota <= 0:
+                continue
+
+            random.shuffle(candidates)
+            qids.extend(candidates[:quota])
+
         random.shuffle(qids)
-        return qids[:20]  # Tageslimit
+
+        print("---- DAILY QUOTAS ----")
+        for dk, d in self.decks.items():
+            meta = d["meta"]
+            qs = d["questions"]
+            candidates = [f"{dk}::{q.id}" for q in qs if f"{dk}::{q.id}" not in self.mastered]
+            remaining = len(candidates)
+            quota = deck_daily_quota(meta.due_date, remaining)
+            print(dk, "remaining=", remaining, "due=", meta.due_date, "quota=", quota)
+        print("----------------------")
+
+        return qids
 
     def _update_progress(self):
         # Tagesziel = len(queue)+mastered_today? -> Wir definieren: today's pack = self.today_set
@@ -677,7 +702,8 @@ class LumioMainWindow(QMainWindow):
             self.fail_counts[self.current_id] = self.fail_counts.get(self.current_id, 0) + 1
             if self.queue and self.queue[0] == self.current_id:
                 self.queue.pop(0)
-            # NICHT wieder hinten anhängen -> keine Wiederholung am selben Tag
+            self.queue.append(self.current_id)  # Wiederholung am selben Tag erzwingen
+
 
 
         self._persist_question_state(self.current_id)
@@ -730,6 +756,7 @@ class LumioMainWindow(QMainWindow):
 
     def _today_completed(self) -> bool:
         return all(gqid in self.mastered for gqid in self.today_set)
+
 
     def changeEvent(self, event):
         super().changeEvent(event)
