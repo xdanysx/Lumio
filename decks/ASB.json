@@ -25,7 +25,7 @@
       "prompt": "Was ist ein ε-Übergang und in welchen Automatenmodellen ist er erlaubt?",
       "rubric": [
         ["epsilon", "ε"],
-        ["ohne eingabesymbol"],
+        ["ohne eingabesymbol", "ohne eingabe"],
         ["nea"],
         ["dea nicht erlaubt"]
       ],
@@ -53,9 +53,10 @@
       "prompt": "Warum sind ε-Zyklen in Automaten problematisch?",
       "rubric": [
         ["epsilon-zyklus"],
-        ["unendlich"],
-        ["entfernen"],
-        ["epsilon-frei"]
+        ["unendlich", "schleife", "endlos"],
+        ["entfernen", "entfernt"],
+        ["epsilon-frei"],
+        ["zustand"]
       ],
       "pass_ratio": 0.7,
       "min_words": 25,

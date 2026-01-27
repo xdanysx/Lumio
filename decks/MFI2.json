@@ -9,7 +9,7 @@
     "type": "text",
     "prompt": "Was ist eine Sigma-Algebra und warum wird sie in der Wahrscheinlichkeitstheorie benötigt?",
     "rubric": [
-      ["sigma-algebra"],
+      ["sigma-algebra", "sigma algebra"],
       ["ereignisse"],
       ["abgeschlossen"],
       ["komplement"],
@@ -26,9 +26,10 @@
       "rubric": [
         ["wahrscheinlichkeitsraum"],
         ["grundraum"],
-        ["sigma-algebra"],
-        ["wahrscheinlichkeit"],
-        ["axiome"]
+        ["sigma-algebra", "sigma algebra"],
+        ["axiome"],
+        ["Kolmogorow"],
+        ["Grundlage"]
       ],
       "pass_ratio": 0.7,
       "min_words": 25,
@@ -373,7 +374,9 @@
         ["stetig"],
         ["wartezeit"],
         ["parameter"],
-        ["gedächtnislos"]
+        ["gedächtnislos"],
+        ["lambda"],
+        ["wahrscheinlichkeitsrate", "wahrscheinlichkeit", "rate"]
       ],
       "pass_ratio": 0.7,
       "min_words": 25,

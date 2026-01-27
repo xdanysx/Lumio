@@ -79,26 +79,84 @@ def normalize(text: str) -> str:
          .replace("ü", "ue")
          .replace("ß", "ss")
     )
-    t = re.sub(r"[^\w\s=*+\-/<>()]", " ", t, flags=re.UNICODE)
+
+    # WICHTIG: Bindestriche/Striche als Worttrenner behandeln
+    # sigma-algebra -> sigma algebra
+    t = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2212\-]+", " ", t)  # diverse dash chars + '-'
+
+    # Sonstige Satzzeichen raus (wir lassen ein paar Operatoren stehen, falls du sie brauchst)
+    t = re.sub(r"[^\w\s=*+/<>()]", " ", t, flags=re.UNICODE)
+
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
-def word_count(norm_text: str) -> int:
-    return 0 if not norm_text else len(norm_text.split())
+def _tokenize(norm_text: str) -> List[str]:
+    return [] if not norm_text else norm_text.split()
+
+def _stem_de(token: str) -> str:
+    """
+    Sehr leichter deutscher Stemmer für deine Use-Cases.
+    Ziel: Axiom/Axiome/Axiomen -> axiom
+    """
+    w = token
+    if len(w) <= 3:
+        return w
+
+    # Häufige deutsche Plural-/Flexionsendungen (grob, aber robust genug)
+    for suf in ("ern", "en", "er", "es", "e", "s", "n"):
+        if len(w) > 4 and w.endswith(suf):
+            w = w[: -len(suf)]
+            break
+
+    return w
+
+def _contains_phrase_stemmed(norm_text: str, phrase: str) -> bool:
+    """
+    Prüft, ob 'phrase' in 'norm_text' vorkommt, aber auf Token-Stämmen.
+    Unterstützt Mehrwort-Phrasen.
+    """
+    nt = normalize(norm_text)  # norm_text ist bei dir i.d.R. schon normalized, aber sicher ist sicher
+    pt = normalize(phrase)
+
+    text_tokens = [_stem_de(x) for x in _tokenize(nt)]
+    phrase_tokens = [_stem_de(x) for x in _tokenize(pt)]
+
+    if not phrase_tokens:
+        return False
+
+    # 1-token Phrase: direkt in Tokenliste suchen
+    if len(phrase_tokens) == 1:
+        p = phrase_tokens[0]
+        return any(tok == p for tok in text_tokens)
+
+    # Mehrwort: contiguous sequence match
+    m = len(phrase_tokens)
+    for i in range(0, len(text_tokens) - m + 1):
+        if text_tokens[i:i+m] == phrase_tokens:
+            return True
+
+    return False
 
 def rubric_hits_details(rubric: List[List[str]], norm_text: str) -> Tuple[int, List[bool], List[Optional[str]]]:
     hits: List[bool] = []
     matched: List[Optional[str]] = []
+
+    # norm_text kommt bei dir aus normalize(user_text)
     for group in rubric:
         found = None
         for phrase in group:
-            if phrase in norm_text:
+            # Stemmed Phrase Match statt "phrase in text"
+            if _contains_phrase_stemmed(norm_text, phrase):
                 found = phrase
                 break
         ok = found is not None
         hits.append(ok)
         matched.append(found)
+
     return sum(hits), hits, matched
+
+def word_count(norm_text: str) -> int:
+    return 0 if not norm_text else len(norm_text.split())
 
 def compute_score(q: TextQuestion, user_text: str) -> Dict[str, Any]:
     norm = normalize(user_text)

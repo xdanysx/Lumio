@@ -267,8 +267,9 @@
         ["copy"],
         ["add"],
         ["dockerfile"],
-        ["archive"],
-        ["url"]
+        ["archive","archiv"],
+        ["url"],
+        ["image"]
       ],
       "pass_ratio": 0.7,
       "min_words": 25,
